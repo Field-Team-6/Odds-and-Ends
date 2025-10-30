@@ -16,7 +16,7 @@ idebug = False
 
 ## OBTAIN KEY, SECRET, AND REFRESH TOKEN FROM COMMAND LINE ARGUMENTS
 parser = argparse.ArgumentParser(description='dropbox_connect_test.py --appkey appkey --appsecret appsecret --reftoken refresh_token')
-parser.add_argument('-a', '--debug', help='turn on debugging messages', action='store_true')
+parser.add_argument('--debug', help='turn on debugging messages', action='store_true')
 parser.add_argument('--appkey', nargs='?', help='App Key provided by Dropbox')
 parser.add_argument('--appsecret', nargs='?', help='App Secret provided by Dropbox')
 parser.add_argument('--reftoken', nargs='?', help='Reference Key provided by  Dropbox'
