@@ -2,7 +2,6 @@
 import argparse
 import sys
 
-import dropbox
 from dropbox import DropboxOAuth2FlowNoRedirect
 
 '''
@@ -49,7 +48,10 @@ auth_code = input("Enter the authorization code here: ").strip()
 
 try:
     oauth_result = auth_flow.finish(auth_code)
-    print("REFRESH TOKEN: " + oauth_result.refresh_token)
+    print('REFRESH TOKEN           : ' + oauth_result.refresh_token)
+    print('USER ID                 : ' + oauth_result.user_id)
+    print('TEMPORARY ACCESS TOKEN  : ' + oauth_result.access_token)
+    print('ACCESS TOKEN EXPIRES    : ' + oauth_result.expires_at.strftime('%Y-%m-%d-%H:%M'))
 except Exception as e:
     print('Error: %s' % (e,))
     exit(1)
