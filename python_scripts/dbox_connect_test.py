@@ -12,11 +12,11 @@ import dropbox
 APP_KEY = ''
 APP_SECRET = ''
 REFRESH_TOKEN = ''
-idebug = False
+verbose = False
 
 ## OBTAIN KEY, SECRET, AND REFRESH TOKEN FROM COMMAND LINE ARGUMENTS
 parser = argparse.ArgumentParser(description='dropbox_connect_test.py --appkey appkey --appsecret appsecret --reftoken refresh_token')
-parser.add_argument('--debug', help='turn on debugging messages', action='store_true')
+parser.add_argument('--verbose', help='turn on helpful output messages', action='store_true')
 parser.add_argument('--appkey', nargs='?', help='App Key provided by Dropbox')
 parser.add_argument('--appsecret', nargs='?', help='App Secret provided by Dropbox')
 parser.add_argument('--reftoken', nargs='?', help='Reference Key provided by  Dropbox'
@@ -40,10 +40,10 @@ if not args.reftoken:
     sys.exit(5)
 else:
     REFRESH_TOKEN = args.reftoken
-if args.debug:
-    idebug = True
+if args.verbose:
+    verbose = True
 
-if idebug:
+if verbose:
     print('APPKEY: ' +  APP_KEY, ' APPSECRET: ' + APP_SECRET, ' REFRESH_TOKEN: ' + REFRESH_TOKEN)
 
 # INITIALIZE THE DROPBOX OBJECT USING THE KEY, SECRET AND REFRESH TOKEN

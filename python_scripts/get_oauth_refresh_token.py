@@ -5,17 +5,16 @@ import sys
 from dropbox import DropboxOAuth2FlowNoRedirect
 
 '''
-This example walks through a basic oauth flow using the existing long-lived token type
-Populate your app key and app secret in order to run this locally
+OBTAIN CREDENTIALS FOR OFFLINE CONNECTION TO DROPBOX USING BASIC OAUTH FLOW.
 '''
 
 APP_KEY = ''
 APP_SECRET = ''
-idebug = False
+verbose = False
 
 ## OBTAIN KEY AND SECRET FROM COMMAND LINE ARGUMENTS
 parser = argparse.ArgumentParser(description='dropbox_connect_test.py --appkey appkey --appsecret appsecret --reftoken refresh_token')
-parser.add_argument('--debug', help='turn on detailed output messages', action='store_true')
+parser.add_argument('--verbose', help='turn on detailed output messages', action='store_true')
 parser.add_argument('--appkey', nargs='?', help='App Key provided by Dropbox')
 parser.add_argument('--appsecret', nargs='?', help='App Secret provided by Dropbox')
 
@@ -32,10 +31,10 @@ if not args.appsecret:
     sys.exit(4)
 else:
     APP_SECRET = args.appsecret
-if args.debug:
-    idebug = True
+if args.verbose:
+    verbose = True
 
-if idebug:
+if verbose:
     print('APPKEY: ' +  APP_KEY, ' APPSECRET: ' + APP_SECRET)
 
 auth_flow = DropboxOAuth2FlowNoRedirect(APP_KEY, APP_SECRET, token_access_type="offline")
