@@ -1,7 +1,6 @@
 
-
-"""Upload the contents of your Downloads folder to Dropbox.
-This is an example app for API v2.
+"""
+UPLOAD THE CONTENTS OF A LOCAL FOLDER TO A DROPBOX FOLDER
 """
 
 from __future__ import print_function
@@ -14,34 +13,74 @@ import six
 import sys
 import time
 import unicodedata
-from dropbox.oauth import DropboxOAuth2FlowNoRedirect
+import dropbox
 
 if sys.version.startswith('2'):
     input = raw_input  # noqa: E501,F821; pylint: disable=redefined-builtin,undefined-variable,useless-suppression
 
-import dropbox
-
-# OAuth2 access token.  TODO: login etc.
 APP_KEY = ''
 APP_SECRET = ''
 REFRESH_TOKEN = ''
-idebug = True
-parser = argparse.ArgumentParser(description='Sync ~/Downloads to Dropbox')
+verbose = False
+dry_run = False
+parser = argparse.ArgumentParser(description='Send new local files to Dropbox folder')
 parser.add_argument('folder', nargs='?', default='dropbox_load',
                     help='Folder name in your Dropbox')
-parser.add_argument('rootdir', nargs='?', default='~/test',
+parser.add_argument('rootdir', nargs='?', default='~/Downloads',
                     help='Local directory to upload')
-parser.add_argument('--reftoken', default=REFRESH_TOKEN,
-                    help='Refresh token '
-                    '(see https://www.dropbox.com/developers/apps)')
+parser.add_argument('--verbose','-v', help='turn on helpful output messages', action='store_true')
+parser.add_argument('--dry_run', help='print messages but do not sync files', action='store_true')
 parser.add_argument('--appkey', help='Your application key from Dropbox')
 parser.add_argument('--appsecret', help='Your application secret from Dropbox')
+parser.add_argument('--reftoken', help='Refresh token from Dropbox')
 parser.add_argument('--yes', '-y', action='store_true',
                     help='Answer yes to all questions')
 parser.add_argument('--no', '-n', action='store_true',
                     help='Answer no to all questions')
 parser.add_argument('--default', '-d', action='store_true',
                     help='Take default answer on all questions')
+args = parser.parse_args()
+
+## PARSE COMMAND LINE ARGUMENTS AND VERIFY VALUES
+if not args.appkey:
+    print('--appkey is mandatory')
+    sys.exit(3)
+else:
+    APP_KEY = args.appkey
+if not args.appsecret:
+    print('--appkey is mandatory')
+    sys.exit(4)
+else:
+    APP_SECRET = args.appsecret
+if not args.reftoken:
+    print('--reftoken is mandatory')
+    sys.exit(5)
+else:
+    REFRESH_TOKEN = args.reftoken
+if sum([bool(b) for b in (args.yes, args.no, args.default)]) > 1:
+    print('At most one of --yes, --no, --default is allowed')
+    sys.exit(6)
+if args.verbose:
+    verbose = True
+if args.dry_run:  ## USE DRY_RUN FOR TESTING SCRIPT BEFORE DEPLOYMENT
+    dry_run = True
+
+folder = args.folder
+rootdir = os.path.expanduser(args.rootdir)
+print('Dropbox folder name:', folder)
+print('Local directory:', rootdir)
+
+# INITIALIZE THE DROPBOX OBJECT USING THE KEY, SECRET AND REFRESH TOKEN
+# THE SDK HANDLES THE TOKEN REFRESH AUTOMATICALLY IN THE BACKGROUND
+dbx = dropbox.Dropbox(
+    app_key=APP_KEY,
+    app_secret=APP_SECRET,
+    oauth2_refresh_token=REFRESH_TOKEN
+)
+
+## DETERMINE THE TEAM SPACE ROOT FOLDER TO ACCESS THE TEAM SPACE FOLDER FT6_AnalyticsBD
+root_namespace_id = dbx.users_get_current_account().root_info.root_namespace_id
+dbx = dbx.with_path_root(dropbox.common.PathRoot.root(root_namespace_id))
 
 def main():
     """ Main program. """
@@ -51,43 +90,14 @@ def main():
     directories, and avoids duplicate uploads by comparing size and
     mtime with the server.
     """
-    ## PARSE COMMAND LINE ARGUMENTS AND VERIFY VALUES
-    args = parser.parse_args()
-    if sum([bool(b) for b in (args.yes, args.no, args.default)]) > 1:
-        print('At most one of --yes, --no, --default is allowed')
-        sys.exit(2)
-    if not args.reftoken:
-        print('--reftoken is mandatory')
-        sys.exit(3)
-    if not args.appkey:
-        print('--appkey is mandatory')
-        sys.exit(4)
-    if not args.appsecret:
-        print('--appkey is mandatory')
-        sys.exit(5)
-
-    folder = args.folder
-    rootdir = os.path.expanduser(args.rootdir)
-    print('Dropbox folder name:', folder)
-    print('Local directory:', rootdir)
     if not os.path.exists(rootdir):
         print(rootdir, 'does not exist on your filesystem')
         sys.exit(6)
     elif not os.path.isdir(rootdir):
         print(rootdir, 'is not a directory on your filesystem')
         sys.exit(7)
-    APP_KEY = args.appkey
-    APP_SECRET = args.appsecret
-    REFRESH_TOKEN = args.reftoken
-
-    print('VALUES: ', APP_KEY,' | ', APP_SECRET,' | ' ,REFRESH_TOKEN)
-
-    ## OBTAIN DROPBOX CONNECTION
-    dbx = dropbox.Dropbox(
-        app_key=APP_KEY,
-        app_secret=APP_SECRET,
-        oauth2_refresh_token=REFRESH_TOKEN
-    )
+    if verbose:
+        print('VALUES: ', APP_KEY,' | ', APP_SECRET,' | ' ,REFRESH_TOKEN)
 
     ## ITERATE THROUGH DIRECTORIES AND FILES UNDER rootdir
     for dn, dirs, files in os.walk(rootdir):
@@ -98,7 +108,7 @@ def main():
         # FIRST DO ALL THE FILES.
         for name in files:
             fullname = os.path.join(dn, name)
-            if not isinstance(name, six.text_type):
+            if not isinstance(name, six.text_type):  ## IF FILE NAME IS NOT INSTANCE OF STR
                 name = name.decode('utf-8')
             nname = unicodedata.normalize('NFC', name)
             if name.startswith('.'):
@@ -117,7 +127,9 @@ def main():
                     print(name, 'is already synced [stats match]')
                 else:
                     print(name, 'exists with different stats, downloading')
-                    res = download(dbx, folder, subfolder, name)
+                    res = ''
+                    if not dry_run:
+                        res = download(dbx, folder, subfolder, name)
                     with open(fullname, 'rb') as f:
                         data = f.read()
                     if res == data:
@@ -125,10 +137,11 @@ def main():
                     else:
                         print(name, 'has changed since last sync')
                         if yesno('Refresh %s' % name, False, args):
-                            upload(dbx, fullname, folder, subfolder, name,
-                                   overwrite=True)
+                            if not dry_run:
+                                upload(dbx, fullname, folder, subfolder, name, overwrite=True)
             elif yesno('Upload %s' % name, True, args):
-                upload(dbx, fullname, folder, subfolder, name)
+                if not dry_run:
+                    upload(dbx, fullname, folder, subfolder, name)
 
         # THEN CHOOSE WHICH SUBDIRECTORIES TO TRAVERSE.
         keep = []
@@ -150,7 +163,6 @@ def main():
 
 def list_folder(dbx, folder, subfolder):
     """List a folder.
-
     Return a dict mapping unicode filenames to
     FileMetadata|FolderMetadata entries.
     """
@@ -204,8 +216,7 @@ def upload(dbx, fullname, folder, subfolder, name, overwrite=False):
         data = f.read()
     with stopwatch('upload %d bytes' % len(data)):
         try:
-            res = dbx.files_upload(
-                data, path, mode,
+            res = dbx.files_upload(data, path, mode,
                 client_modified=datetime.datetime(*time.gmtime(mtime)[:6]),
                 mute=True)
         except dropbox.exceptions.ApiError as err:

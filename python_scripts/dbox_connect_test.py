@@ -24,7 +24,6 @@ parser.add_argument('--reftoken', nargs='?', help='Reference Key provided by  Dr
 
 ## PARSE COMMAND LINE ARGUMENTS AND VERIFY
 args = parser.parse_args()
-
 if not args.appkey:
     print('--appkey is mandatory')
     sys.exit(3)
@@ -48,7 +47,6 @@ if verbose:
 
 # INITIALIZE THE DROPBOX OBJECT USING THE KEY, SECRET AND REFRESH TOKEN
 # THE SDK HANDLES THE TOKEN REFRESH AUTOMATICALLY IN THE BACKGROUND
-
 dbx = dropbox.Dropbox(
     app_key=APP_KEY,
     app_secret=APP_SECRET,
