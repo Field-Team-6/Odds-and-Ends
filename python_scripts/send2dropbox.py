@@ -1,4 +1,4 @@
-
+#! /usr/bin/env python3
 """
 UPLOAD THE CONTENTS OF A LOCAL FOLDER TO A DROPBOX FOLDER
 """
