@@ -7,7 +7,7 @@ from __future__ import print_function
 
 import argparse
 import contextlib
-import datetime
+from datetime import datetime
 import os
 import six
 import sys
@@ -21,6 +21,9 @@ if sys.version.startswith('2'):
 APP_KEY = ''
 APP_SECRET = ''
 REFRESH_TOKEN = ''
+START_MSG  = '============================== STARTING UPLOAD RUN ==================================='
+FINISH_MSG = '============================== FINISHED UPLOAD RUN ==================================='
+DRYRUN_MSG = '======================== DRY RUN NOT UPLOADING ANYTHING   ============================'
 verbose = False
 dry_run = False
 parser = argparse.ArgumentParser(description='Send new local files to Dropbox folder')
@@ -67,8 +70,6 @@ if args.dry_run:  ## USE DRY_RUN FOR TESTING SCRIPT BEFORE DEPLOYMENT
 
 folder = args.folder
 rootdir = os.path.expanduser(args.rootdir)
-print('Dropbox folder name:', folder)
-print('Local directory:', rootdir)
 
 # INITIALIZE THE DROPBOX OBJECT USING THE KEY, SECRET AND REFRESH TOKEN
 # THE SDK HANDLES THE TOKEN REFRESH AUTOMATICALLY IN THE BACKGROUND
@@ -90,6 +91,11 @@ def main():
     directories, and avoids duplicate uploads by comparing size and
     mtime with the server.
     """
+    print(datetime.now(), START_MSG)
+    if dry_run:
+        print(datetime.now(),DRYRUN_MSG)
+    print('Dropbox folder name:', folder)
+    print('Local directory:', rootdir)
     if not os.path.exists(rootdir):
         print(rootdir, 'does not exist on your filesystem')
         sys.exit(6)
@@ -120,7 +126,7 @@ def main():
             elif nname in listing:
                 md = listing[nname]
                 mtime = os.path.getmtime(fullname)
-                mtime_dt = datetime.datetime(*time.gmtime(mtime)[:6])
+                mtime_dt = datetime(*time.gmtime(mtime)[:6])
                 size = os.path.getsize(fullname)
                 if (isinstance(md, dropbox.files.FileMetadata) and
                         mtime_dt == md.client_modified and size == md.size):
@@ -160,19 +166,20 @@ def main():
         dirs[:] = keep
 
     dbx.close()
+    print(datetime.now(), FINISH_MSG)
 
-def list_folder(dbx, folder, subfolder):
+def list_folder(ddbx, lfolder, subfolder):
     """List a folder.
     Return a dict mapping unicode filenames to
     FileMetadata|FolderMetadata entries.
     """
-    path = '/%s/%s' % (folder, subfolder.replace(os.path.sep, '/'))
+    path = '/%s/%s' % (lfolder, subfolder.replace(os.path.sep, '/'))
     while '//' in path:
         path = path.replace('//', '/')
     path = path.rstrip('/')
     try:
         with stopwatch('list_folder'):
-            res = dbx.files_list_folder(path)
+            res = ddbx.files_list_folder(path)
     except dropbox.exceptions.ApiError as err:
         print('Folder listing failed for', path, '-- assumed empty:', err)
         return {}
@@ -182,17 +189,17 @@ def list_folder(dbx, folder, subfolder):
             rv[entry.name] = entry
         return rv
 
-def download(dbx, folder, subfolder, name):
+def download(ddbx, dfolder, subfolder, name):
     """Download a file.
 
     Return the bytes of the file, or None if it doesn't exist.
     """
-    path = '/%s/%s/%s' % (folder, subfolder.replace(os.path.sep, '/'), name)
+    path = '/%s/%s/%s' % (dfolder, subfolder.replace(os.path.sep, '/'), name)
     while '//' in path:
         path = path.replace('//', '/')
     with stopwatch('download'):
         try:
-            md, res = dbx.files_download(path)
+            md, res = ddbx.files_download(path)
         except dropbox.exceptions.HttpError as err:
             print('*** HTTP error', err)
             return None
@@ -200,12 +207,12 @@ def download(dbx, folder, subfolder, name):
     print(len(data), 'bytes; md:', md)
     return data
 
-def upload(dbx, fullname, folder, subfolder, name, overwrite=False):
+def upload(ddbx, fullname, ufolder, subfolder, name, overwrite=False):
     """Upload a file.
 
     Return the request response, or None in case of error.
     """
-    path = '/%s/%s/%s' % (folder, subfolder.replace(os.path.sep, '/'), name)
+    path = '/%s/%s/%s' % (ufolder, subfolder.replace(os.path.sep, '/'), name)
     while '//' in path:
         path = path.replace('//', '/')
     mode = (dropbox.files.WriteMode.overwrite
@@ -216,8 +223,8 @@ def upload(dbx, fullname, folder, subfolder, name, overwrite=False):
         data = f.read()
     with stopwatch('upload %d bytes' % len(data)):
         try:
-            res = dbx.files_upload(data, path, mode,
-                client_modified=datetime.datetime(*time.gmtime(mtime)[:6]),
+            res = ddbx.files_upload(data, path, mode,
+                client_modified=datetime(*time.gmtime(mtime)[:6]),
                 mute=True)
         except dropbox.exceptions.ApiError as err:
             print('*** API error', err)
@@ -225,7 +232,7 @@ def upload(dbx, fullname, folder, subfolder, name, overwrite=False):
     print('uploaded as', res.name.encode('utf8'))
     return res
 
-def yesno(message, default, args):
+def yesno(message, default, yargs):
     """Handy helper function to ask a yes/no question.
 
     Command line arguments --yes or --no force the answer;
@@ -240,13 +247,13 @@ def yesno(message, default, args):
     - q or quit exits the program
     - p or pdb invokes the debugger
     """
-    if args.default:
+    if yargs.default:
         print(message + '? [auto]', 'Y' if default else 'N')
         return default
-    if args.yes:
+    if yargs.yes:
         print(message + '? [auto] YES')
         return True
-    if args.no:
+    if yargs.no:
         print(message + '? [auto] NO')
         return False
     if default:
